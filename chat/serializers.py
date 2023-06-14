@@ -28,14 +28,57 @@ class GroupSerializer(serializers.ModelSerializer):
     class Meta:
         model=Group
         fields=("group_name",'group_info','members')
-        def create(self,validated_data,creater,members):
+        def create(self,validated_data,creater):
             validated_data["creater"]=CurrentUserDefault()
-            print(True,type(validated_data),type(validated_data["members"]))
+            # members = validated_data.pop('members', [])
+            # print(True,type(validated_data),type(validated_data["members"]))
 
-            if creater in validated_data["members"]:
-                print(True,type(validated_data),type(validated_data["members"]))
-            group=Group.objects.create(validated_data["group_name"],creater,validated_data["group_info"],members)
+            # if creater in validated_data["members"]:
+            #     print(True,type(validated_data),type(validated_data["members"]))
+            group=Group.objects.create(validated_data["group_name"],creater,validated_data["group_info"],validated_data["members"])
+            group.members.add(creater)
+            group.save()
             return group
+        # def create(self, validated_data):
+        #     request = self.context['request']
+        #     creater = request.user
+        #     members = validated_data.pop('members', [])
+
+        #     group = Group.objects.create(creater=creater, **validated_data)
+        #     group.members.set(members)
+
+        #     return group
+
+class MessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Messages
+        fields = '__all__'
+
+class MemberSerializer(serializers.ModelSerializer):
+    class Meta:
+        model=Group
+        fields=('members',)
+        # members = serializers.ListField()
+
+        def update(self,instance,validated_data):
+            # group=Group.objects.get(group_name=parent_group)
+            instance.members=validated_data.get('members',instance.members)
+            # group.members.add(validated_data.members)
+            instance.save()
+            return instance
+            
+# class MessageSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model=Messages
+#         fields=("message_text")
+#         def create(self,validated_data,parent_group,parent_user):
+#             validated_data["creater"]=CurrentUserDefault()
+#             # print(True,type(validated_data),type(validated_data["members"]))
+
+#             # if creater in validated_data["members"]:
+#             #     print(True,type(validated_data),type(validated_data["members"]))
+#             message=Messages.objects.create(parent_group,parent_user,validated_data["message"])
+#             return message
     
 class LoginSerializer(serializers.Serializer):
     """

@@ -23,6 +23,12 @@ class Group(models.Model):
 
     def __str__(self):
         return self.group_name
+    # def save(self, *args, **kwargs):
+        # if self.pk is None:
+        #     # Only add the creator to members when the group is first created
+        #     self.members.add(self.creater)
+        # super().save(*args, **kwargs)
+        # self.members.add(self.creater)
 
     def last_x_messages(grp_name, times=0):
         group = Group.objects.get(group_name=grp_name)

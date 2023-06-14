@@ -16,5 +16,7 @@ urlpatterns = [
     path("api/register",views.RegisterView.as_view()),
     path("api/logout",views.logoutView.as_view()),
     path("api/groups",views.GroupView.as_view()),
+    path("api/groups/<grp_name>",views.MembersView.as_view()),
+    path("api/groups/<grp_name>/messages",views.MessageView.as_view()),
 ]
 urlpatterns = format_suffix_patterns(urlpatterns,allowed=["json","html"])

@@ -2,7 +2,7 @@
 from django.http import JsonResponse
 from .models import Group
 from django.core import serializers
-from .serializers import GroupSerializer,RegisterSerializer,UserSerializer
+from .serializers import GroupSerializer,RegisterSerializer,UserSerializer,MemberSerializer,MessageSerializer
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
@@ -10,6 +10,7 @@ from rest_framework import permissions
 from rest_framework import views,generics
 from knox.models import AuthToken
 from . import serializers
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt,csrf_protect,ensure_csrf_cookie
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
@@ -55,39 +56,107 @@ class GroupView(generics.GenericAPIView):
     permission_classes=(permissions.IsAuthenticated,)
     serializer_class=GroupSerializer
     queryset=Group.objects.all()
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
+
 
     def get(self,request,format=None):
-       
-        # queryset=request.user.all_groups.all()
         groups = request.user.all_groups.all().values()
         x=list(groups)
-        # groups_json=serializers.serialize('json',groups)
         print(type(groups))
         
         if  not groups:
             return Response("No groups exist .To create use api/creategroup",status.HTTP_204_NO_CONTENT)
         return Response(x,status=status.HTTP_200_OK)
     def post(self, request, *args, **kwargs):
-        # for i in request.data.values():
-        #     print(i)
-        data1=list(request.data.items())
-        print(data1)
-        # print(request.data.members)
-        # return Response("great")
-        # data1["creater"]=self.request.user
-        return Response("admin created",status.HTTP_200_OK)
-        # serializer = self.get_serializer(data=request.data)
-        # serializer.is_valid(raise_exception=True)
-        # # members=list(request.data["members"])
-        # # members.append()
-        # # if self.request.user  not in request.data["members"]:
-        # #     members.append(self.request.user)
-        # group = serializer.save(creater=self.request.user)
-        #     # group = serializer.save(creater=self.request.user,)
-        # return Response({
-        # "group": GroupSerializer(group, context=self.get_serializer_context()).data,
-        # }) 
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        group = serializer.save(creater=self.request.user)
+        group.members.add(self.request.user)
+        return Response({
+            "group": serializer.data
+        }, status=status.HTTP_201_CREATED)
     
+
+class MembersView(generics.GenericAPIView):
+    permission_classes=(permissions.IsAuthenticated,)
+    serializer_class=MemberSerializer
+    queryset=Group.objects.all()
+    def get_serializer_class(self):
+        if self.request.method == 'PUT':
+            return MemberSerializer
+        return super().get_serializer_class()
+    def get(self,request,grp_name):
+        group = get_object_or_404(Group, group_name=grp_name)
+        groups = request.user.all_groups.get(group_name=grp_name)
+        try:
+            groups = request.user.all_groups.get(group_name=grp_name)
+            members=groups.members.all()
+            x=members.values()
+            return Response(x,status.HTTP_200_OK)
+        except:
+            return Response("Group Doesnot Exist",status.HTTP_404_NOT_FOUND)
+   
+    def put(self, request,grp_name, *args, **kwargs):
+        group = request.user.all_groups.get(group_name=grp_name)
+        member_ids = request.data.get('members', [])
+        members = User.objects.filter(pk__in=member_ids)
+
+        for member in members:
+            group.members.add(member)
+
+        serializer = self.get_serializer(group)
+        return Response(serializer.data)
+
+            
+           
+class MessageView(generics.GenericAPIView):
+    permission_classes=(permissions.IsAuthenticated,)
+    serializer_class=MessageSerializer
+    queryset=Group.objects.all()
+    def get_queryset(self):
+        group_name = self.kwargs['grp_name']
+
+        try:
+            group = Group.objects.get(group_name=group_name)
+            messages = Messages.objects.filter(parent_group=group)
+        except Group.DoesNotExist:
+            messages = []
+        return messages
+    def get(self,request,*args, **kwargs):
+       
+        # queryset=request.user.all_groups.all()
+        #  def get(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.serializer_class(queryset, many=True)
+        return Response(serializer.data)
+
+        # return Response(msgs,status.HTTP_200_OK)
+        
+        # return Response(x,status=status.HTTP_200_OK)
+    def post(self, request, *args, **kwargs):
+        
+    #    def post(self, request, *args, **kwargs):
+        group_name = self.kwargs['grp_name']
+        try:
+            group = Group.objects.get(group_name=group_name)
+        except Group.DoesNotExist:
+            return Response("Parent group does not exist.", status=status.HTTP_404_NOT_FOUND)
+        
+        data = {
+            'parent_group': group.pk,
+            'parent_user': self.request.user.pk,
+            'message_text': request.data.get('message_text', ''),
+            'date_posted': timezone.localtime()
+        }
+        
+        serializer = self.serializer_class(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 
@@ -169,7 +238,7 @@ def home(request):
 #     try:
 #         request.user.all_groups.get(group_name=grp_name)
 #         # above line will throw exception if user is not permitted for the view
-#         msgs = Messages.objects.filter(parent_group=group).all()
+        # msgs = Messages.objects.filter(parent_group=group).all()
 #         context = {"msgs": msgs, "group_name": grp_name}
 #         return render(request, "home/group.html", context)
 
