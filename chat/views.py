@@ -43,7 +43,7 @@ class RegisterView(generics.GenericAPIView):
         return Response({
         "user": UserSerializer(user, context=self.get_serializer_context()).data,
         "token": AuthToken.objects.create(user)[1]
-        }) 
+        },status=status.HTTP_201_CREATED) 
 # @api_view(["GET"])
 class logoutView(views.APIView):
     permission_classes=(permissions.IsAuthenticated,)
@@ -68,7 +68,7 @@ class GroupView(generics.GenericAPIView):
         print(type(groups))
         
         if  not groups:
-            return Response("No groups exist .To create use api/creategroup",status.HTTP_204_NO_CONTENT)
+            return Response("No groups exist .To create use api/creategroup",status.HTTP_404_NOT_FOUND)
         return Response(x,status=status.HTTP_200_OK)
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -96,7 +96,7 @@ class MembersView(generics.GenericAPIView):
             members=groups.members.all()
             x=members.values()
             return Response(x,status.HTTP_200_OK)
-        except:
+        except Group.DoesNotExist:
             return Response("Group Doesnot Exist",status.HTTP_404_NOT_FOUND)
    
     def put(self, request,grp_name, *args, **kwargs):
@@ -108,8 +108,7 @@ class MembersView(generics.GenericAPIView):
             group.members.add(member)
 
         serializer = self.get_serializer(group)
-        return Response(serializer.data)
-
+        return Response(serializer.data,status.HTTP_202_ACCEPTED)
             
            
 class MessageView(generics.GenericAPIView):
